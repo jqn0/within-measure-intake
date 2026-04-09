@@ -1,0 +1,85 @@
+/**
+ * Within Measure - Career Coaching Intake Processor
+ * Maps HTML Form Data to Google Doc Template & Emails PDF
+ */
+
+function doPost(e) {
+  // 1. SETTINGS - UPDATE THESE TWO IDs
+  const templateId = 'YOUR_GOOGLE_DOC_TEMPLATE_ID_HERE'; 
+  const folderId   = 'YOUR_FOLDER_ID_HERE'; 
+  const myEmail    = 'jason@withinmeasure.com';
+
+  // 2. Parse the incoming data from your HTML form
+  const data = JSON.parse(e.postData.contents);
+  const timestamp = new Date().toLocaleDateString();
+
+  try {
+    // 3. Create a temporary copy of the template
+    const fileName = `Intake_Blueprint_${data.firstName}_${data.lastName}`;
+    const copy = DriveApp.getFileById(templateId).makeCopy(fileName, DriveApp.getFolderById(folderId));
+    const doc = DocumentApp.openById(copy.getId());
+    const body = doc.getBody();
+
+    // 4. Map the Form Data to the {{placeholders}} in your Doc
+    // This list matches the keys we built in your updated HTML script
+    const replacements = {
+      '{{firstName}}': data.firstName || '',
+      '{{lastName}}': data.lastName || '',
+      '{{date}}': timestamp,
+      '{{jobTitle}}': data.jobTitle || '',
+      '{{employer}}': data.employer || '',
+      '{{yearsExp}}': data.yearsExp || '',
+      '{{education}}': data.education || '',
+      '{{credentials}}': data.credentials || '',
+      '{{targetLocations}}': data.targetLocations || '',
+      '{{remotePreference}}': data.remotePreference || '',
+      '{{background}}': data.background || '',
+      '{{changeGoal}}': data.changeGoal || '',
+      // Assessments
+      '{{clifton}}': data.clifton || 'N/A',
+      '{{mbti}}': data.mbti || 'N/A',
+      '{{sdi}}': data.sdi || 'N/A',
+      '{{disc}}': data.disc || 'N/A',
+      '{{enneagram}}': data.enneagram || 'N/A',
+      '{{ocean}}': data.ocean || 'N/A',
+      '{{fourcolours}}': data.fourcolours || 'N/A',
+      '{{eq}}': data.eq || 'N/A',
+      // Ikigai Qs
+      '{{q1}}': data.q1 || '', '{{q2}}': data.q2 || '', '{{q3}}': data.q3 || '',
+      '{{q4}}': data.q4 || '', '{{q5}}': data.q5 || '', '{{q6}}': data.q6 || '',
+      '{{q7}}': data.q7 || '', '{{q8}}': data.q8 || '', '{{q9}}': data.q9 || '',
+      '{{q10}}': data.q10 || '', '{{q11}}': data.q11 || '', '{{q12}}': data.q12 || '',
+      // Closing
+      '{{q13}}': data.q13 || '', '{{q14}}': data.q14 || '', 
+      '{{q15}}': data.q15 || '', '{{q16}}': data.q16 || '',
+      '{{anythingElse}}': data.anythingElse || 'None provided.'
+    };
+
+    // Execute all replacements in the document body
+    for (let key in replacements) {
+      body.replaceText(key, replacements[key]);
+    }
+
+    // 5. Save and Close to prepare for PDF conversion
+    doc.saveAndClose();
+
+    // 6. Convert to PDF
+    const pdf = copy.getAs(MimeType.PDF);
+
+    // 7. Email the PDF to yourself
+    MailApp.sendEmail({
+      to: myEmail,
+      subject: `New Intake: ${data.firstName} ${data.lastName} - Within Measure`,
+      body: `Hi Jason,\n\nA new intake form has been submitted for Within Measure.\n\nClient: ${data.firstName} ${data.lastName}\nAttached is the career blueprint PDF.`,
+      attachments: [pdf]
+    });
+
+    // 8. Cleanup - (Optional) Remove the temporary Google Doc copy, leaving only the PDF in your folder
+    // copy.setTrashed(true); 
+
+    return ContentService.createTextOutput(JSON.stringify({ 'result': 'success' })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ 'result': 'error', 'error': error.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
